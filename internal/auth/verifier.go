@@ -21,7 +21,7 @@ type Verifier struct {
 	clientID          string
 	keySet            oidc.KeySet
 	userinfoEndpoint  string
-	supportedSignAlgs []string
+	supportedSignAlgs []string // nil accepts any JWKS alg (matches gateway verifier).
 	clockSkew         time.Duration
 }
 

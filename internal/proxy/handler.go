@@ -48,7 +48,7 @@ type requestOptions struct {
 
 type responseError struct {
 	Status int
-	Err    error
+	Err    error // nil Err means respond with the status text.
 }
 
 func (e responseError) Error() string {
@@ -75,7 +75,6 @@ func NewHandler(cfg config.Config, resolver *auth.Resolver, files filesv1.FilesS
 	}
 	dialer := checker.NewDialer()
 	transport := &http.Transport{
-		Proxy:             http.ProxyFromEnvironment,
 		DialContext:       dialer.DialContext,
 		ForceAttemptHTTP2: true,
 	}
@@ -205,9 +204,6 @@ func parseSizeParam(value string, max int) (*int, error) {
 }
 
 func parseFileID(target *url.URL) (string, error) {
-	if target == nil {
-		return "", fmt.Errorf("url is required")
-	}
 	if !strings.EqualFold(target.Host, "file") {
 		return "", fmt.Errorf("unsupported agyn host")
 	}

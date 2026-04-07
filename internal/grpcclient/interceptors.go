@@ -8,11 +8,6 @@ import (
 	"google.golang.org/grpc/metadata"
 )
 
-const (
-	identityIDMetadataKey   = "x-identity-id"
-	identityTypeMetadataKey = "x-identity-type"
-)
-
 func identityUnaryClientInterceptor() grpc.UnaryClientInterceptor {
 	return func(ctx context.Context, method string, req, reply any, cc *grpc.ClientConn, invoker grpc.UnaryInvoker, opts ...grpc.CallOption) error {
 		ctx = appendIdentityMetadata(ctx)
@@ -30,14 +25,15 @@ func identityStreamClientInterceptor() grpc.StreamClientInterceptor {
 func appendIdentityMetadata(ctx context.Context) context.Context {
 	resolved, ok := identity.IdentityFromContext(ctx)
 	if !ok {
+		// No identity in context; keep metadata unchanged.
 		return ctx
 	}
 
 	return metadata.AppendToOutgoingContext(
 		ctx,
-		identityIDMetadataKey,
+		identity.MetadataKeyIdentityID,
 		resolved.IdentityID,
-		identityTypeMetadataKey,
+		identity.MetadataKeyIdentityType,
 		string(resolved.IdentityType),
 	)
 }

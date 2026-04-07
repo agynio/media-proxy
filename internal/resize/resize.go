@@ -52,6 +52,7 @@ func outputFormat(contentType string) (imaging.Format, string) {
 	case "image/png", "image/gif":
 		return imaging.PNG, "image/png"
 	default:
+		// imaging does not encode webp; fall back to png for other formats.
 		return imaging.PNG, "image/png"
 	}
 }

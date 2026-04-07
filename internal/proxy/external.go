@@ -19,52 +19,47 @@ func (h *Handler) handleExternal(ctx context.Context, w http.ResponseWriter, tar
 	requestCtx, cancel := context.WithTimeout(ctx, h.cfg.RequestTimeout)
 	defer cancel()
 
-	resp, err := h.fetchExternal(requestCtx, target, options.rangeHeader)
+	resp, contentType, err := h.fetchAndValidateExternal(requestCtx, target, options.rangeHeader)
 	if err != nil {
-		return mapExternalError(err)
-	}
-	if err := checkExternalStatus(resp.StatusCode); err != nil {
-		resp.Body.Close()
 		return err
-	}
-	contentType, err := normalizeContentType(resp.Header.Get("Content-Type"))
-	if err != nil {
-		resp.Body.Close()
-		return responseError{Status: http.StatusUnsupportedMediaType, Err: err}
-	}
-	if !isAllowedExternalContentType(contentType) {
-		resp.Body.Close()
-		return responseError{Status: http.StatusUnsupportedMediaType}
 	}
 
 	if options.size != nil && strings.HasPrefix(contentType, "image/") && resp.StatusCode == http.StatusPartialContent && options.rangeHeader != "" {
 		resp.Body.Close()
-		resp, err = h.fetchExternal(requestCtx, target, "")
+		resp, contentType, err = h.fetchAndValidateExternal(requestCtx, target, "")
 		if err != nil {
-			return mapExternalError(err)
-		}
-		if err := checkExternalStatus(resp.StatusCode); err != nil {
-			resp.Body.Close()
 			return err
-		}
-		contentType, err = normalizeContentType(resp.Header.Get("Content-Type"))
-		if err != nil {
-			resp.Body.Close()
-			return responseError{Status: http.StatusUnsupportedMediaType, Err: err}
-		}
-		if !isAllowedExternalContentType(contentType) {
-			resp.Body.Close()
-			return responseError{Status: http.StatusUnsupportedMediaType}
 		}
 	}
 
 	defer resp.Body.Close()
 
 	if options.size != nil && strings.HasPrefix(contentType, "image/") {
-		return h.writeResizedImage(w, resp, contentType, options)
+		return h.writeResizedImage(w, resp, contentType, *options.size, options.rangeHeader)
 	}
 
 	return h.streamExternalResponse(w, resp, contentType)
+}
+
+func (h *Handler) fetchAndValidateExternal(ctx context.Context, target *url.URL, rangeHeader string) (*http.Response, string, error) {
+	resp, err := h.fetchExternal(ctx, target, rangeHeader)
+	if err != nil {
+		return nil, "", mapExternalError(err)
+	}
+	if err := checkExternalStatus(resp.StatusCode); err != nil {
+		resp.Body.Close()
+		return nil, "", err
+	}
+	contentType, err := normalizeContentType(resp.Header.Get("Content-Type"))
+	if err != nil {
+		resp.Body.Close()
+		return nil, "", responseError{Status: http.StatusUnsupportedMediaType, Err: err}
+	}
+	if !isAllowedExternalContentType(contentType) {
+		resp.Body.Close()
+		return nil, "", responseError{Status: http.StatusUnsupportedMediaType}
+	}
+	return resp, contentType, nil
 }
 
 func (h *Handler) fetchExternal(ctx context.Context, target *url.URL, rangeHeader string) (*http.Response, error) {
@@ -127,10 +122,7 @@ func (h *Handler) streamExternalResponse(w http.ResponseWriter, resp *http.Respo
 	return nil
 }
 
-func (h *Handler) writeResizedImage(w http.ResponseWriter, resp *http.Response, contentType string, options requestOptions) error {
-	if options.size == nil {
-		return responseError{Status: http.StatusBadRequest}
-	}
+func (h *Handler) writeResizedImage(w http.ResponseWriter, resp *http.Response, contentType string, size int, rangeHeader string) error {
 	if h.cfg.MaxResponseSize > 0 && resp.ContentLength > h.cfg.MaxResponseSize {
 		return responseError{Status: http.StatusRequestEntityTooLarge}
 	}
@@ -143,12 +135,12 @@ func (h *Handler) writeResizedImage(w http.ResponseWriter, resp *http.Response, 
 		return err
 	}
 
-	resized, err := resize.Image(body, contentType, *options.size)
+	resized, err := resize.Image(body, contentType, size)
 	if err != nil {
 		return responseError{Status: http.StatusBadGateway, Err: err}
 	}
 
-	rangeResult, err := applyRange(resized.Bytes, options.rangeHeader)
+	rangeResult, err := applyRange(resized.Bytes, rangeHeader)
 	if err != nil {
 		var rangeErr rangeError
 		if errors.As(err, &rangeErr) {

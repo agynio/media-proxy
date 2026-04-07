@@ -18,6 +18,8 @@ func TestDefaultCheckerDeniedIPs(t *testing.T) {
 		"172.16.0.5",
 		"192.168.1.1",
 		"169.254.1.1",
+		"8.8.8.8",
+		"1.1.1.1",
 		"::1",
 		"fe80::1",
 		"fc00::1",
@@ -44,8 +46,6 @@ func TestDefaultCheckerAllowedIPs(t *testing.T) {
 	}
 
 	testCases := []string{
-		"8.8.8.8",
-		"1.1.1.1",
 		"2001:4860:4860::8888",
 	}
 
@@ -65,8 +65,8 @@ func TestCheckerEdgeCases(t *testing.T) {
 		t.Fatalf("failed to build checker: %v", err)
 	}
 
-	if checker.Denied(nil) {
-		t.Fatalf("expected nil IP to be allowed")
+	if !checker.Denied(nil) {
+		t.Fatalf("expected nil IP to be denied")
 	}
 
 	ip := net.ParseIP("")
