@@ -1,0 +1,7 @@
+*.local
+.env
+.DS_Store
+dist/
+*.log
+tmp/
+.gen/
