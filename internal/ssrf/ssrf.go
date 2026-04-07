@@ -17,7 +17,6 @@ var defaultDenyCIDRs = []string{
 	"::1/128",
 	"fe80::/10",
 	"fc00::/7",
-	"::ffff:0:0/96",
 }
 
 type Checker struct {
@@ -78,11 +77,9 @@ func (c *Checker) Denied(ip net.IP) bool {
 	if ip == nil {
 		return true
 	}
-	normalized := ip.To16()
-	if normalized == nil {
-		return true
+	if normalized := ip.To4(); normalized != nil {
+		ip = normalized
 	}
-	ip = normalized
 	for _, network := range c.networks {
 		if network.Contains(ip) {
 			return true
