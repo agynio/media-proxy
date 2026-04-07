@@ -63,6 +63,11 @@ func (c *Checker) Control(network, address string, _ syscall.RawConn) error {
 	if ip == nil {
 		return fmt.Errorf("invalid IP address: %s", host)
 	}
+	if !strings.Contains(host, ":") {
+		if ipv4 := ip.To4(); ipv4 != nil {
+			ip = ipv4
+		}
+	}
 	if c.Denied(ip) {
 		return DeniedError{IP: ip}
 	}
@@ -73,7 +78,14 @@ func (c *Checker) Denied(ip net.IP) bool {
 	if ip == nil {
 		return false
 	}
+	ipLen := len(ip)
 	for _, network := range c.networks {
+		if ipLen == net.IPv4len && len(network.IP) == net.IPv6len {
+			continue
+		}
+		if ipLen == net.IPv6len && len(network.IP) == net.IPv4len {
+			continue
+		}
 		if network.Contains(ip) {
 			return true
 		}
