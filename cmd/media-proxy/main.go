@@ -77,13 +77,7 @@ func main() {
 		w.WriteHeader(http.StatusOK)
 	})
 
-	corsHandler := cors.New(cors.Options{
-		AllowedOrigins: []string{cfg.CORSAllowedOrigin},
-		AllowedMethods: []string{http.MethodGet, http.MethodOptions},
-		AllowedHeaders: []string{"Authorization", "Range"},
-		ExposedHeaders: []string{"Content-Type", "Content-Range", "Accept-Ranges", "Content-Disposition", "Content-Length"},
-		MaxAge:         86400,
-	}).Handler(mux)
+	corsHandler := newCORSHandler(cfg, mux)
 
 	server := &http.Server{
 		Addr:              cfg.ListenAddr,
@@ -94,4 +88,15 @@ func main() {
 	if err := server.ListenAndServe(); err != nil && !errors.Is(err, http.ErrServerClosed) {
 		log.Printf("server error: %v", err)
 	}
+}
+
+func newCORSHandler(cfg config.Config, handler http.Handler) http.Handler {
+	return cors.New(cors.Options{
+		AllowedOrigins:   []string{cfg.CORSAllowedOrigin},
+		AllowedMethods:   []string{http.MethodGet, http.MethodOptions},
+		AllowedHeaders:   []string{"Authorization", "Range"},
+		ExposedHeaders:   []string{"Content-Type", "Content-Range", "Accept-Ranges", "Content-Disposition", "Content-Length"},
+		AllowCredentials: true,
+		MaxAge:           86400,
+	}).Handler(handler)
 }

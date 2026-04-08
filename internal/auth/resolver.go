@@ -3,6 +3,7 @@ package auth
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -79,7 +80,7 @@ func (r *Resolver) ResolveFromToken(ctx context.Context, accessToken string) (id
 	return identityFromUser(createResponse.GetUser())
 }
 
-func (r *Resolver) fetchUserInfo(ctx context.Context, accessToken, expectedSub string) (*oidc.UserInfo, error) {
+func (r *Resolver) fetchUserInfo(ctx context.Context, accessToken, expectedSub string) (_ *oidc.UserInfo, err error) {
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, r.userinfoEndpoint, nil)
 	if err != nil {
 		return nil, err
@@ -90,7 +91,15 @@ func (r *Resolver) fetchUserInfo(ctx context.Context, accessToken, expectedSub s
 	if err != nil {
 		return nil, err
 	}
-	defer resp.Body.Close()
+	defer func() {
+		if closeErr := resp.Body.Close(); closeErr != nil {
+			if err == nil {
+				err = closeErr
+				return
+			}
+			err = errors.Join(err, closeErr)
+		}
+	}()
 
 	const maxUserInfoResponseBytes = 1 << 20
 	limitedBody := io.LimitReader(resp.Body, maxUserInfoResponseBytes)

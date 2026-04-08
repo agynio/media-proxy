@@ -25,20 +25,30 @@ func (h *Handler) handleExternal(ctx context.Context, w http.ResponseWriter, tar
 	}
 
 	if options.size != nil && strings.HasPrefix(contentType, "image/") && resp.StatusCode == http.StatusPartialContent && options.rangeHeader != "" {
-		resp.Body.Close()
+		if closeErr := resp.Body.Close(); closeErr != nil {
+			return closeErr
+		}
 		resp, contentType, err = h.fetchAndValidateExternal(requestCtx, target, "")
 		if err != nil {
 			return err
 		}
 	}
 
-	defer resp.Body.Close()
-
+	var handlerErr error
 	if options.size != nil && strings.HasPrefix(contentType, "image/") {
-		return h.writeResizedImage(w, resp, contentType, *options.size, options.rangeHeader)
+		handlerErr = h.writeResizedImage(w, resp, contentType, *options.size, options.rangeHeader)
+	} else {
+		handlerErr = h.streamExternalResponse(w, resp, contentType)
 	}
 
-	return h.streamExternalResponse(w, resp, contentType)
+	if closeErr := resp.Body.Close(); closeErr != nil {
+		if handlerErr != nil {
+			return errors.Join(handlerErr, closeErr)
+		}
+		return closeErr
+	}
+
+	return handlerErr
 }
 
 func (h *Handler) fetchAndValidateExternal(ctx context.Context, target *url.URL, rangeHeader string) (*http.Response, string, error) {
@@ -47,17 +57,16 @@ func (h *Handler) fetchAndValidateExternal(ctx context.Context, target *url.URL,
 		return nil, "", mapExternalError(err)
 	}
 	if err := checkExternalStatus(resp.StatusCode); err != nil {
-		resp.Body.Close()
-		return nil, "", err
+		return nil, "", closeResponseWithError(resp, err)
 	}
 	contentType, err := normalizeContentType(resp.Header.Get("Content-Type"))
 	if err != nil {
-		resp.Body.Close()
-		return nil, "", responseError{Status: http.StatusUnsupportedMediaType, Err: err}
+		respErr := responseError{Status: http.StatusUnsupportedMediaType, Err: err}
+		return nil, "", closeResponseWithError(resp, respErr)
 	}
 	if !isAllowedExternalContentType(contentType) {
-		resp.Body.Close()
-		return nil, "", responseError{Status: http.StatusUnsupportedMediaType}
+		respErr := responseError{Status: http.StatusUnsupportedMediaType}
+		return nil, "", closeResponseWithError(resp, respErr)
 	}
 	return resp, contentType, nil
 }
@@ -71,6 +80,16 @@ func (h *Handler) fetchExternal(ctx context.Context, target *url.URL, rangeHeade
 		req.Header.Set("Range", rangeHeader)
 	}
 	return h.httpClient.Do(req)
+}
+
+func closeResponseWithError(resp *http.Response, err error) error {
+	if closeErr := resp.Body.Close(); closeErr != nil {
+		if err == nil {
+			return closeErr
+		}
+		return errors.Join(err, closeErr)
+	}
+	return err
 }
 
 func checkExternalStatus(statusCode int) error {
