@@ -10,7 +10,6 @@ import (
 	"strconv"
 	"strings"
 
-	authorizationv1 "github.com/agynio/media-proxy/.gen/go/agynio/api/authorization/v1"
 	filesv1 "github.com/agynio/media-proxy/.gen/go/agynio/api/files/v1"
 	"github.com/agynio/media-proxy/internal/auth"
 	"github.com/agynio/media-proxy/internal/config"
@@ -36,7 +35,6 @@ type Handler struct {
 	cfg        config.Config
 	resolver   *auth.Resolver
 	files      filesv1.FilesServiceClient
-	authz      authorizationv1.AuthorizationServiceClient
 	httpClient *http.Client
 }
 
@@ -58,15 +56,12 @@ func (e responseError) Error() string {
 	return e.Err.Error()
 }
 
-func NewHandler(cfg config.Config, resolver *auth.Resolver, files filesv1.FilesServiceClient, authz authorizationv1.AuthorizationServiceClient) (*Handler, error) {
+func NewHandler(cfg config.Config, resolver *auth.Resolver, files filesv1.FilesServiceClient) (*Handler, error) {
 	if resolver == nil {
 		return nil, fmt.Errorf("resolver is required")
 	}
 	if files == nil {
 		return nil, fmt.Errorf("files client is required")
-	}
-	if authz == nil {
-		return nil, fmt.Errorf("authorization client is required")
 	}
 
 	checker, err := ssrf.DefaultChecker()
@@ -100,7 +95,6 @@ func NewHandler(cfg config.Config, resolver *auth.Resolver, files filesv1.FilesS
 		cfg:        cfg,
 		resolver:   resolver,
 		files:      files,
-		authz:      authz,
 		httpClient: client,
 	}, nil
 }
