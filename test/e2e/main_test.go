@@ -102,7 +102,7 @@ func setupCredentials(ctx context.Context, _ *cleanupStack) error {
 func requestOIDCAccessToken(ctx context.Context) (string, error) {
 	form := url.Values{}
 	form.Set("grant_type", "password")
-	form.Set("username", "e2e-test-user")
+	form.Set("username", "e2e-test-user@test.com")
 	form.Set("scope", "openid profile email")
 	form.Set("client_id", mockAuthClientID)
 	form.Set("client_secret", mockAuthClientSecret)
