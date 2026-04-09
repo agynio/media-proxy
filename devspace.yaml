@@ -85,6 +85,9 @@ functions:
             - name: media-proxy
               image: ghcr.io/agynio/devcontainer-go:1 # keep in sync with E2E_IMAGE
               workingDir: /opt/app/data
+              livenessProbe: null
+              readinessProbe: null
+              startupProbe: null
               command:
                 - sh
                 - -c
