@@ -70,7 +70,7 @@ functions:
     fi
   patch_deployment: |-
     echo "Patching media-proxy deployment for DevSpace..."
-    kubectl patch deployment media-proxy-media-proxy -n ${MEDIA_PROXY_NAMESPACE} --type strategic --patch "$(cat <<'EOF'
+    kubectl patch deployment media-proxy -n ${MEDIA_PROXY_NAMESPACE} --type strategic --patch "$(cat <<'EOF'
     spec:
       template:
         spec:
