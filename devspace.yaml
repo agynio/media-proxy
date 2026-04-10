@@ -102,10 +102,21 @@ pipelines:
       trap 'stop_dev e2e-runner; purge_deployments e2e-runner' EXIT
       start_dev e2e-runner --disable-pod-replace
       echo "Waiting for source files to sync..."
-      sleep 5
+      synced=false
+      for i in $(seq 1 60); do
+        if exec_container --label-selector=app.kubernetes.io/name=devspace-app,app.kubernetes.io/component=e2e-runner -n ${MEDIA_PROXY_NAMESPACE} -- test -f /opt/app/data/go.mod; then
+          synced=true
+          break
+        fi
+        sleep 2
+      done
+      if [ "$synced" != "true" ]; then
+        echo "ERROR: Source files did not sync within 120s" >&2
+        exit 1
+      fi
       echo "Generating protobuf types..."
       exec_container --label-selector=app.kubernetes.io/name=devspace-app,app.kubernetes.io/component=e2e-runner -n ${MEDIA_PROXY_NAMESPACE} -- \
-        bash -c 'cd /opt/app/data && buf generate buf.build/agynio/api --include-imports --path agynio/api/files/v1 --path agynio/api/users/v1 --path agynio/api/authorization/v1'
+        bash -c 'cd /opt/app/data && buf generate buf.build/agynio/api --include-imports --path agynio/api/files/v1 --path agynio/api/users/v1'
       echo "Running e2e tests..."
       exec_container --label-selector=app.kubernetes.io/name=devspace-app,app.kubernetes.io/component=e2e-runner -n ${MEDIA_PROXY_NAMESPACE} -- \
         bash -c 'cd /opt/app/data && go test -v -count=1 -tags e2e ./test/e2e/'
@@ -136,10 +147,21 @@ pipelines:
       create_deployments e2e-runner
       start_dev e2e-runner --disable-pod-replace
       echo "Waiting for source files to sync..."
-      sleep 5
+      synced=false
+      for i in $(seq 1 60); do
+        if exec_container --label-selector=app.kubernetes.io/name=devspace-app,app.kubernetes.io/component=e2e-runner -n ${MEDIA_PROXY_NAMESPACE} -- test -f /opt/app/data/go.mod; then
+          synced=true
+          break
+        fi
+        sleep 2
+      done
+      if [ "$synced" != "true" ]; then
+        echo "ERROR: Source files did not sync within 120s" >&2
+        exit 1
+      fi
       echo "Generating protobuf types..."
       exec_container --label-selector=app.kubernetes.io/name=devspace-app,app.kubernetes.io/component=e2e-runner -n ${MEDIA_PROXY_NAMESPACE} -- \
-        bash -c 'cd /opt/app/data && buf generate buf.build/agynio/api --include-imports --path agynio/api/files/v1 --path agynio/api/users/v1 --path agynio/api/authorization/v1'
+        bash -c 'cd /opt/app/data && buf generate buf.build/agynio/api --include-imports --path agynio/api/files/v1 --path agynio/api/users/v1'
       echo "Running e2e tests..."
       exec_container --label-selector=app.kubernetes.io/name=devspace-app,app.kubernetes.io/component=e2e-runner -n ${MEDIA_PROXY_NAMESPACE} -- \
         bash -c 'cd /opt/app/data && go test -v -count=1 -tags e2e ./test/e2e/'
@@ -209,7 +231,7 @@ dev:
               sleep 1; elapsed=$((elapsed + 1))
               [ "$elapsed" -ge 120 ] && { echo "ERROR: sync timeout" >&2; exit 1; }
             done
-            buf generate buf.build/agynio/api --include-imports --path agynio/api/files/v1 --path agynio/api/users/v1 --path agynio/api/authorization/v1
+            buf generate buf.build/agynio/api --include-imports --path agynio/api/files/v1 --path agynio/api/users/v1
             exec go run ./cmd/media-proxy
         workingDir: /opt/app/data
         resources:

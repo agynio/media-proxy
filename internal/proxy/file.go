@@ -109,11 +109,15 @@ func (h *Handler) fetchFileContent(ctx context.Context, fileID string) ([]byte, 
 }
 
 func mapFilesError(err error) error {
-	if status.Code(err) == codes.NotFound {
+	switch status.Code(err) {
+	case codes.NotFound:
 		return responseError{Status: http.StatusNotFound}
-	}
-	if status.Code(err) == codes.InvalidArgument {
+	case codes.InvalidArgument:
 		return responseError{Status: http.StatusBadRequest}
+	case codes.PermissionDenied:
+		return responseError{Status: http.StatusForbidden}
+	case codes.Unauthenticated:
+		return responseError{Status: http.StatusUnauthorized}
 	}
 	return responseError{Status: http.StatusBadGateway, Err: err}
 }
