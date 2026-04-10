@@ -129,9 +129,6 @@ dev:
     labelSelector:
       app.kubernetes.io/name: media-proxy
       app.kubernetes.io/instance: media-proxy
-    persistPaths:
-      - path: /opt/app/data
-        containerName: media-proxy
     patches:
       - op: remove
         path: spec.containers.name=media-proxy.livenessProbe
@@ -177,6 +174,9 @@ dev:
             buf generate buf.build/agynio/api --include-imports --path agynio/api/files/v1 --path agynio/api/users/v1 --path agynio/api/authorization/v1
             exec go run ./cmd/media-proxy
         workingDir: /opt/app/data
+        persistPaths:
+          - path: /opt/app/data
+            skipPopulate: true
         sync:
           - path: ./:/opt/app/data
             excludePaths:
