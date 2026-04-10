@@ -181,11 +181,13 @@ dev:
               - .devspace/
               - /.gen/
               - /tmp/
+              - bootstrap/
             uploadExcludePaths:
               - .git/
               - .devspace/
               - /.gen/
               - /tmp/
+              - bootstrap/
             downloadExcludePaths:
               - .git/
               - .devspace/
