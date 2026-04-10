@@ -114,6 +114,41 @@ pipelines:
       purge_deployments e2e-runner
       trap - EXIT
 
+  ci-e2e:
+    run: |-
+      disable_argocd_sync
+      start_dev media-proxy
+      trap 'stop_dev e2e-runner; purge_deployments e2e-runner; stop_dev media-proxy' EXIT
+      echo "Waiting for media-proxy to be healthy on :8080..."
+      healthy=false
+      for i in $(seq 1 60); do
+        if exec_container --label-selector=app.kubernetes.io/name=media-proxy -n ${MEDIA_PROXY_NAMESPACE} -- bash -c 'nc -z localhost 8080 >/dev/null 2>&1 || (echo > /dev/tcp/localhost/8080) >/dev/null 2>&1'; then
+          healthy=true
+          break
+        fi
+        sleep 2
+      done
+      if [ "$healthy" != "true" ]; then
+        echo "ERROR: Media Proxy did not become healthy within 120s" >&2
+        exit 1
+      fi
+      echo "Media proxy is healthy. Running e2e tests..."
+      create_deployments e2e-runner
+      start_dev e2e-runner --disable-pod-replace
+      echo "Waiting for source files to sync..."
+      sleep 5
+      echo "Generating protobuf types..."
+      exec_container --label-selector=app.kubernetes.io/name=devspace-app,app.kubernetes.io/component=e2e-runner -n ${MEDIA_PROXY_NAMESPACE} -- \
+        bash -c 'cd /opt/app/data && buf generate buf.build/agynio/api --include-imports --path agynio/api/files/v1 --path agynio/api/users/v1 --path agynio/api/authorization/v1'
+      echo "Running e2e tests..."
+      exec_container --label-selector=app.kubernetes.io/name=devspace-app,app.kubernetes.io/component=e2e-runner -n ${MEDIA_PROXY_NAMESPACE} -- \
+        bash -c 'cd /opt/app/data && go test -v -count=1 -tags e2e ./test/e2e/'
+      echo "Cleaning up..."
+      stop_dev e2e-runner
+      purge_deployments e2e-runner
+      stop_dev media-proxy
+      trap - EXIT
+
 hooks:
   - name: restore-argocd-auto-sync
     events:
