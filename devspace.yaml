@@ -196,6 +196,9 @@ dev:
       media-proxy:
         container: media-proxy
         devImage: ghcr.io/agynio/devcontainer-go:1
+        persistPaths:
+          - path: /opt/app/data
+            skipPopulate: true
         command:
           - sh
           - -c
