@@ -23,7 +23,6 @@ type Config struct {
 	OIDCClientID      string
 	UsersGRPCTarget   string
 	FilesGRPCTarget   string
-	AuthzGRPCTarget   string
 	CORSAllowedOrigin string
 	MaxResponseSize   int64
 	RequestTimeout    time.Duration
@@ -53,10 +52,6 @@ func FromEnv() (Config, error) {
 		return Config{}, err
 	}
 	cfg.FilesGRPCTarget, err = requiredEnv("FILES_GRPC_TARGET")
-	if err != nil {
-		return Config{}, err
-	}
-	cfg.AuthzGRPCTarget, err = requiredEnv("AUTHZ_GRPC_TARGET")
 	if err != nil {
 		return Config{}, err
 	}

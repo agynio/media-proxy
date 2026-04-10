@@ -170,7 +170,6 @@ mediaProxy:
   oidcClientId: ""
   usersGrpcTarget: "users:50051"
   filesGrpcTarget: "files:50051"
-  authzGrpcTarget: "authorization:50051"
   corsAllowedOrigin: "https://agyn.dev"
   maxResponseSize: 52428800
   requestTimeout: "30s"
