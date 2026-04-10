@@ -68,64 +68,6 @@ functions:
     else
       echo "WARNING: ArgoCD Application 'media-proxy' not found in argocd namespace."
     fi
-  patch_deployment: |-
-    echo "Patching media-proxy deployment for DevSpace..."
-    kubectl patch deployment media-proxy -n ${MEDIA_PROXY_NAMESPACE} --type strategic --patch "$(cat <<'EOF'
-    spec:
-      template:
-        spec:
-          securityContext:
-            runAsUser: 1000
-            fsGroup: 1000
-          initContainers: []
-          volumes:
-            - name: data
-              emptyDir: {}
-          containers:
-            - name: media-proxy
-              image: ghcr.io/agynio/devcontainer-go:1 # keep in sync with E2E_IMAGE
-              workingDir: /opt/app/data
-              livenessProbe: null
-              readinessProbe: null
-              startupProbe: null
-              command:
-                - sh
-                - -c
-                - |
-                  set -eu
-                  elapsed=0
-                  while [ ! -f /opt/app/data/go.mod ]; do
-                    sleep 1; elapsed=$((elapsed + 1))
-                    [ "$elapsed" -ge 120 ] && { echo "ERROR: sync timeout" >&2; exit 1; }
-                  done
-                  buf generate buf.build/agynio/api \
-                    --include-imports \
-                    --path agynio/api/files/v1 \
-                    --path agynio/api/users/v1 \
-                    --path agynio/api/authorization/v1
-                  exec go run ./cmd/media-proxy
-              volumeMounts:
-                - name: data
-                  mountPath: /opt/app/data
-              resources:
-                requests:
-                  cpu: 500m
-                  memory: 1Gi
-                limits:
-                  cpu: "2"
-                  memory: 4Gi
-              securityContext:
-                runAsNonRoot: true
-                runAsUser: 1000
-                runAsGroup: 1000
-                readOnlyRootFilesystem: false
-                allowPrivilegeEscalation: false
-                capabilities:
-                  drop: ["ALL"]
-                seccompProfile:
-                  type: RuntimeDefault
-    EOF
-    )"
 
 pipelines:
   dev:
@@ -135,24 +77,21 @@ pipelines:
         description: "Keep DevSpace running and stream logs"
     run: |-
       disable_argocd_sync
-      patch_deployment
-      if [ "$(get_flag "watch")" == "true" ]; then
-        start_dev --disable-pod-replace media-proxy
-      else
-        start_dev --disable-pod-replace media-proxy
-        echo "Waiting for media-proxy to be healthy on :8080..."
-        healthy=false
-        for i in $(seq 1 60); do
-          if exec_container --label-selector=app.kubernetes.io/name=media-proxy -n ${MEDIA_PROXY_NAMESPACE} -- bash -c 'nc -z localhost 8080 >/dev/null 2>&1 || (echo > /dev/tcp/localhost/8080) >/dev/null 2>&1'; then
-            healthy=true
-            break
-          fi
-          sleep 2
-        done
-        if [ "$healthy" != "true" ]; then
-          echo "ERROR: Media Proxy did not become healthy within 120s" >&2
-          exit 1
+      start_dev media-proxy
+      echo "Waiting for media-proxy to be healthy on :8080..."
+      healthy=false
+      for i in $(seq 1 60); do
+        if exec_container --label-selector=app.kubernetes.io/name=media-proxy -n ${MEDIA_PROXY_NAMESPACE} -- bash -c 'nc -z localhost 8080 >/dev/null 2>&1 || (echo > /dev/tcp/localhost/8080) >/dev/null 2>&1'; then
+          healthy=true
+          break
         fi
+        sleep 2
+      done
+      if [ "$healthy" != "true" ]; then
+        echo "ERROR: Media Proxy did not become healthy within 120s" >&2
+        exit 1
+      fi
+      if [ "$(get_flag "watch")" != "true" ]; then
         echo "Dev environment ready. Stopping dev session."
         stop_dev media-proxy
       fi
@@ -190,6 +129,48 @@ dev:
     labelSelector:
       app.kubernetes.io/name: media-proxy
       app.kubernetes.io/instance: media-proxy
+    devImage: ghcr.io/agynio/devcontainer-go:1
+    command:
+      - sh
+      - -c
+      - |-
+        set -eu
+        elapsed=0
+        while [ ! -f /opt/app/data/go.mod ]; do
+          sleep 1; elapsed=$((elapsed + 1))
+          [ "$elapsed" -ge 120 ] && { echo "ERROR: sync timeout" >&2; exit 1; }
+        done
+        buf generate buf.build/agynio/api --include-imports --path agynio/api/files/v1 --path agynio/api/users/v1 --path agynio/api/authorization/v1
+        exec go run ./cmd/media-proxy
+    workDir: /opt/app/data
+    patches:
+      - op: remove
+        path: spec.containers.name=media-proxy.livenessProbe
+      - op: remove
+        path: spec.containers.name=media-proxy.readinessProbe
+      - op: remove
+        path: spec.containers.name=media-proxy.startupProbe
+      - op: replace
+        path: spec.containers.name=media-proxy.resources
+        value:
+          requests:
+            cpu: 500m
+            memory: 1Gi
+          limits:
+            cpu: "2"
+            memory: 4Gi
+      - op: replace
+        path: spec.containers.name=media-proxy.securityContext
+        value:
+          runAsNonRoot: true
+          runAsUser: 1000
+          runAsGroup: 1000
+          readOnlyRootFilesystem: false
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop: ["ALL"]
+          seccompProfile:
+            type: RuntimeDefault
     containers:
       media-proxy:
         container: media-proxy
