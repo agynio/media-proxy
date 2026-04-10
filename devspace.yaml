@@ -142,7 +142,7 @@ dev:
         done
         buf generate buf.build/agynio/api --include-imports --path agynio/api/files/v1 --path agynio/api/users/v1 --path agynio/api/authorization/v1
         exec go run ./cmd/media-proxy
-    workDir: /opt/app/data
+    workingDir: /opt/app/data
     patches:
       - op: remove
         path: spec.containers.name=media-proxy.livenessProbe
