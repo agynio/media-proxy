@@ -68,6 +68,64 @@ functions:
     else
       echo "WARNING: ArgoCD Application 'media-proxy' not found in argocd namespace."
     fi
+  patch_deployment: |-
+    echo "Patching media-proxy deployment for DevSpace..."
+    kubectl patch deployment media-proxy -n ${MEDIA_PROXY_NAMESPACE} --type strategic --patch "$(cat <<'EOF'
+    spec:
+      template:
+        spec:
+          securityContext:
+            runAsUser: 1000
+            fsGroup: 1000
+          initContainers: []
+          volumes:
+            - name: data
+              emptyDir: {}
+          containers:
+            - name: media-proxy
+              image: ghcr.io/agynio/devcontainer-go:1 # keep in sync with E2E_IMAGE
+              workingDir: /opt/app/data
+              command:
+                - sh
+                - -c
+                - |
+                  set -eu
+                  elapsed=0
+                  while [ ! -f /opt/app/data/go.mod ]; do
+                    sleep 1; elapsed=$((elapsed + 1))
+                    [ "$elapsed" -ge 120 ] && { echo "ERROR: sync timeout" >&2; exit 1; }
+                  done
+                  buf generate buf.build/agynio/api \
+                    --include-imports \
+                    --path agynio/api/files/v1 \
+                    --path agynio/api/users/v1
+                  exec go run ./cmd/media-proxy
+              volumeMounts:
+                - name: data
+                  mountPath: /opt/app/data
+              resources:
+                requests:
+                  cpu: 500m
+                  memory: 1Gi
+                limits:
+                  cpu: "2"
+                  memory: 4Gi
+              securityContext:
+                runAsNonRoot: true
+                runAsUser: 1000
+                runAsGroup: 1000
+                readOnlyRootFilesystem: false
+                allowPrivilegeEscalation: false
+                capabilities:
+                  drop: ["ALL"]
+                seccompProfile:
+                  type: RuntimeDefault
+    EOF
+    )"
+    kubectl patch deployment media-proxy -n ${MEDIA_PROXY_NAMESPACE} --type json --patch '[
+      {"op": "remove", "path": "/spec/template/spec/containers/0/livenessProbe"},
+      {"op": "remove", "path": "/spec/template/spec/containers/0/readinessProbe"}
+    ]'
 
 pipelines:
   dev:
@@ -77,21 +135,24 @@ pipelines:
         description: "Keep DevSpace running and stream logs"
     run: |-
       disable_argocd_sync
-      start_dev media-proxy
-      echo "Waiting for media-proxy to be healthy on :8080..."
-      healthy=false
-      for i in $(seq 1 60); do
-        if exec_container --label-selector=app.kubernetes.io/name=media-proxy -n ${MEDIA_PROXY_NAMESPACE} -- bash -c 'nc -z localhost 8080 >/dev/null 2>&1 || (echo > /dev/tcp/localhost/8080) >/dev/null 2>&1'; then
-          healthy=true
-          break
+      patch_deployment
+      if [ "$(get_flag "watch")" == "true" ]; then
+        start_dev --disable-pod-replace media-proxy
+      else
+        start_dev --disable-pod-replace media-proxy
+        echo "Waiting for media-proxy to be healthy on :8080..."
+        healthy=false
+        for i in $(seq 1 60); do
+          if exec_container --label-selector=app.kubernetes.io/name=media-proxy -n ${MEDIA_PROXY_NAMESPACE} -- bash -c 'nc -z localhost 8080 >/dev/null 2>&1 || (echo > /dev/tcp/localhost/8080) >/dev/null 2>&1'; then
+            healthy=true
+            break
+          fi
+          sleep 2
+        done
+        if [ "$healthy" != "true" ]; then
+          echo "ERROR: Media Proxy did not become healthy within 120s" >&2
+          exit 1
         fi
-        sleep 2
-      done
-      if [ "$healthy" != "true" ]; then
-        echo "ERROR: Media Proxy did not become healthy within 120s" >&2
-        exit 1
-      fi
-      if [ "$(get_flag "watch")" != "true" ]; then
         echo "Dev environment ready. Stopping dev session."
         stop_dev media-proxy
       fi
@@ -125,51 +186,6 @@ pipelines:
       purge_deployments e2e-runner
       trap - EXIT
 
-  ci-e2e:
-    run: |-
-      disable_argocd_sync
-      start_dev media-proxy
-      trap 'stop_dev e2e-runner; purge_deployments e2e-runner; stop_dev media-proxy' EXIT
-      echo "Waiting for media-proxy to be healthy on :8080..."
-      healthy=false
-      for i in $(seq 1 60); do
-        if exec_container --label-selector=app.kubernetes.io/name=media-proxy -n ${MEDIA_PROXY_NAMESPACE} -- bash -c 'nc -z localhost 8080 >/dev/null 2>&1 || (echo > /dev/tcp/localhost/8080) >/dev/null 2>&1'; then
-          healthy=true
-          break
-        fi
-        sleep 2
-      done
-      if [ "$healthy" != "true" ]; then
-        echo "ERROR: Media Proxy did not become healthy within 120s" >&2
-        exit 1
-      fi
-      echo "Media proxy is healthy. Running e2e tests..."
-      create_deployments e2e-runner
-      start_dev e2e-runner --disable-pod-replace
-      echo "Waiting for source files to sync..."
-      synced=false
-      for i in $(seq 1 60); do
-        if exec_container --label-selector=app.kubernetes.io/name=devspace-app,app.kubernetes.io/component=e2e-runner -n ${MEDIA_PROXY_NAMESPACE} -- test -f /opt/app/data/go.mod; then
-          synced=true
-          break
-        fi
-        sleep 2
-      done
-      if [ "$synced" != "true" ]; then
-        echo "ERROR: Source files did not sync within 120s" >&2
-        exit 1
-      fi
-      echo "Generating protobuf types..."
-      exec_container --label-selector=app.kubernetes.io/name=devspace-app,app.kubernetes.io/component=e2e-runner -n ${MEDIA_PROXY_NAMESPACE} -- \
-        bash -c 'cd /opt/app/data && buf generate buf.build/agynio/api --include-imports --path agynio/api/files/v1 --path agynio/api/users/v1'
-      echo "Running e2e tests..."
-      exec_container --label-selector=app.kubernetes.io/name=devspace-app,app.kubernetes.io/component=e2e-runner -n ${MEDIA_PROXY_NAMESPACE} -- \
-        bash -c 'cd /opt/app/data && go test -v -count=1 -tags e2e ./test/e2e/'
-      echo "Cleaning up..."
-      stop_dev e2e-runner
-      purge_deployments e2e-runner
-      stop_dev media-proxy
-      trap - EXIT
 
 hooks:
   - name: restore-argocd-auto-sync
@@ -186,61 +202,9 @@ dev:
     labelSelector:
       app.kubernetes.io/name: media-proxy
       app.kubernetes.io/instance: media-proxy
-    patches:
-      - op: remove
-        path: spec.containers.name=media-proxy.livenessProbe
-      - op: remove
-        path: spec.containers.name=media-proxy.readinessProbe
-      - op: remove
-        path: spec.containers.name=media-proxy.startupProbe
-      - op: replace
-        path: spec.containers.name=media-proxy.resources
-        value:
-          requests:
-            cpu: 500m
-            memory: 1Gi
-          limits:
-            cpu: "2"
-            memory: 4Gi
-      - op: replace
-        path: spec.containers.name=media-proxy.securityContext
-        value:
-          runAsNonRoot: true
-          runAsUser: 1000
-          runAsGroup: 1000
-          readOnlyRootFilesystem: false
-          allowPrivilegeEscalation: false
-          capabilities:
-            drop: ["ALL"]
-          seccompProfile:
-            type: RuntimeDefault
     containers:
       media-proxy:
         container: media-proxy
-        devImage: ghcr.io/agynio/devcontainer-go:1
-        persistPaths:
-          - path: /opt/app/data
-            skipPopulate: true
-        command:
-          - sh
-          - -c
-          - |-
-            set -eu
-            elapsed=0
-            while [ ! -f /opt/app/data/go.mod ]; do
-              sleep 1; elapsed=$((elapsed + 1))
-              [ "$elapsed" -ge 120 ] && { echo "ERROR: sync timeout" >&2; exit 1; }
-            done
-            buf generate buf.build/agynio/api --include-imports --path agynio/api/files/v1 --path agynio/api/users/v1
-            exec go run ./cmd/media-proxy
-        workingDir: /opt/app/data
-        resources:
-          limits:
-            cpu: "2"
-            memory: 4Gi
-          requests:
-            cpu: 500m
-            memory: 1Gi
         sync:
           - path: ./:/opt/app/data
             excludePaths:

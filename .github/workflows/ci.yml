@@ -95,7 +95,12 @@ jobs:
         working-directory: bootstrap
         run: ./.github/scripts/verify_platform_health.sh
 
+      - name: Deploy PR code to cluster
+        env:
+          KUBECONFIG: ${{ github.workspace }}/bootstrap/stacks/k8s/.kube/agyn-local-kubeconfig.yaml
+        run: devspace run-pipeline dev
+
       - name: Run E2E tests
         env:
           KUBECONFIG: ${{ github.workspace }}/bootstrap/stacks/k8s/.kube/agyn-local-kubeconfig.yaml
-        run: devspace run-pipeline ci-e2e
+        run: devspace run-pipeline test-e2e
