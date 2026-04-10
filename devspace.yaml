@@ -129,6 +129,9 @@ dev:
     labelSelector:
       app.kubernetes.io/name: media-proxy
       app.kubernetes.io/instance: media-proxy
+    persistPaths:
+      - path: /opt/app/data
+        containerName: media-proxy
     patches:
       - op: remove
         path: spec.containers.name=media-proxy.livenessProbe
