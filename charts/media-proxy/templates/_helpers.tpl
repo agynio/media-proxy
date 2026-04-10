@@ -18,9 +18,6 @@
 {{- $filesTarget := trimAll " \n\t" (default "files:50051" .Values.mediaProxy.filesGrpcTarget) -}}
 {{- $env = append $env (dict "name" "FILES_GRPC_TARGET" "value" $filesTarget) -}}
 
-{{- $authzTarget := trimAll " \n\t" (default "authorization:50051" .Values.mediaProxy.authzGrpcTarget) -}}
-{{- $env = append $env (dict "name" "AUTHZ_GRPC_TARGET" "value" $authzTarget) -}}
-
 {{- $corsOrigin := trimAll " \n\t" (default "https://agyn.dev" .Values.mediaProxy.corsAllowedOrigin) -}}
 {{- if $corsOrigin }}
 {{- $env = append $env (dict "name" "CORS_ALLOWED_ORIGIN" "value" $corsOrigin) -}}

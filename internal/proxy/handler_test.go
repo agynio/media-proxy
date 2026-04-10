@@ -250,6 +250,16 @@ func TestMapFilesError(t *testing.T) {
 			expected: http.StatusBadRequest,
 		},
 		{
+			name:     "permission-denied",
+			err:      status.Error(codes.PermissionDenied, "denied"),
+			expected: http.StatusForbidden,
+		},
+		{
+			name:     "unauthenticated",
+			err:      status.Error(codes.Unauthenticated, "missing"),
+			expected: http.StatusUnauthorized,
+		},
+		{
 			name:     "default",
 			err:      status.Error(codes.Internal, "boom"),
 			expected: http.StatusBadGateway,

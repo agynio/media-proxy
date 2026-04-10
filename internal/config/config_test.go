@@ -39,7 +39,6 @@ func TestFromEnvMissingRequired(t *testing.T) {
 		"OIDC_CLIENT_ID",
 		"USERS_GRPC_TARGET",
 		"FILES_GRPC_TARGET",
-		"AUTHZ_GRPC_TARGET",
 	}
 
 	for _, missing := range required {
@@ -59,5 +58,4 @@ func setRequiredEnv(t *testing.T) {
 	t.Setenv("OIDC_CLIENT_ID", "client-id")
 	t.Setenv("USERS_GRPC_TARGET", "users:50051")
 	t.Setenv("FILES_GRPC_TARGET", "files:50051")
-	t.Setenv("AUTHZ_GRPC_TARGET", "authz:50051")
 }

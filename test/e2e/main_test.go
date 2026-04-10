@@ -27,7 +27,6 @@ import (
 const (
 	mockAuthTokenURL     = "https://mockauth.dev/r/301ebb13-15a8-48f4-baac-e3fa25be29fc/oidc/token"
 	mockAuthClientID     = "client_MU95KU3gHQf5Ir7p"
-	mockAuthClientSecret = "XPKka2i9uzISrKZ95zxli8sY51BK4eTJ"
 )
 
 var (
@@ -102,10 +101,9 @@ func setupCredentials(ctx context.Context, _ *cleanupStack) error {
 func requestOIDCAccessToken(ctx context.Context) (string, error) {
 	form := url.Values{}
 	form.Set("grant_type", "password")
-	form.Set("username", "e2e-test-user")
+	form.Set("username", "e2e-test-user@test.com")
 	form.Set("scope", "openid profile email")
 	form.Set("client_id", mockAuthClientID)
-	form.Set("client_secret", mockAuthClientSecret)
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, mockAuthTokenURL, strings.NewReader(form.Encode()))
 	if err != nil {

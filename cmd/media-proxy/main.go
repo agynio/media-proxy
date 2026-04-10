@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"time"
 
-	authorizationv1 "github.com/agynio/media-proxy/.gen/go/agynio/api/authorization/v1"
 	filesv1 "github.com/agynio/media-proxy/.gen/go/agynio/api/files/v1"
 	usersv1 "github.com/agynio/media-proxy/.gen/go/agynio/api/users/v1"
 	"github.com/agynio/media-proxy/internal/auth"
@@ -51,22 +50,12 @@ func main() {
 		}
 	}()
 
-	authzClient, err := grpcclient.New(cfg.AuthzGRPCTarget, authorizationv1.NewAuthorizationServiceClient)
-	if err != nil {
-		log.Fatalf("authorization client error: %v", err)
-	}
-	defer func() {
-		if err := authzClient.Close(); err != nil {
-			log.Printf("authorization client close error: %v", err)
-		}
-	}()
-
 	resolver, err := auth.NewResolver(verifier, usersClient.Service(), &http.Client{Timeout: 10 * time.Second})
 	if err != nil {
 		log.Fatalf("auth resolver error: %v", err)
 	}
 
-	handler, err := proxy.NewHandler(cfg, resolver, filesClient.Service(), authzClient.Service())
+	handler, err := proxy.NewHandler(cfg, resolver, filesClient.Service())
 	if err != nil {
 		log.Fatalf("proxy handler error: %v", err)
 	}

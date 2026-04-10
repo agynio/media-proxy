@@ -10,7 +10,6 @@ import (
 	"strconv"
 	"strings"
 
-	authorizationv1 "github.com/agynio/media-proxy/.gen/go/agynio/api/authorization/v1"
 	filesv1 "github.com/agynio/media-proxy/.gen/go/agynio/api/files/v1"
 	"github.com/agynio/media-proxy/internal/identity"
 	"github.com/agynio/media-proxy/internal/resize"
@@ -20,10 +19,6 @@ import (
 
 func (h *Handler) handleFile(ctx context.Context, w http.ResponseWriter, fileID string, options requestOptions) error {
 	identityCtx := identity.WithIdentity(ctx, options.identity)
-
-	if err := h.checkAuthorization(identityCtx, options.identity, fileID); err != nil {
-		return err
-	}
 
 	metadata, err := h.files.GetFileMetadata(identityCtx, &filesv1.GetFileMetadataRequest{FileId: fileID})
 	if err != nil {
@@ -83,29 +78,6 @@ func (h *Handler) handleFile(ctx context.Context, w http.ResponseWriter, fileID 
 	return nil
 }
 
-func (h *Handler) checkAuthorization(ctx context.Context, resolved identity.ResolvedIdentity, fileID string) error {
-	user := fmt.Sprintf("identity:%s", resolved.IdentityID)
-	object := fmt.Sprintf("file:%s", fileID)
-
-	resp, err := h.authz.Check(ctx, &authorizationv1.CheckRequest{
-		TupleKey: &authorizationv1.TupleKey{
-			User:     user,
-			Relation: "can_read",
-			Object:   object,
-		},
-	})
-	if err != nil {
-		return responseError{Status: http.StatusBadGateway, Err: err}
-	}
-	if resp == nil {
-		return responseError{Status: http.StatusBadGateway, Err: fmt.Errorf("authorization response missing")}
-	}
-	if !resp.GetAllowed() {
-		return responseError{Status: http.StatusForbidden}
-	}
-	return nil
-}
-
 func (h *Handler) fetchFileContent(ctx context.Context, fileID string) ([]byte, error) {
 	stream, err := h.files.GetFileContent(ctx, &filesv1.GetFileContentRequest{FileId: fileID})
 	if err != nil {
@@ -137,11 +109,15 @@ func (h *Handler) fetchFileContent(ctx context.Context, fileID string) ([]byte, 
 }
 
 func mapFilesError(err error) error {
-	if status.Code(err) == codes.NotFound {
+	switch status.Code(err) {
+	case codes.NotFound:
 		return responseError{Status: http.StatusNotFound}
-	}
-	if status.Code(err) == codes.InvalidArgument {
+	case codes.InvalidArgument:
 		return responseError{Status: http.StatusBadRequest}
+	case codes.PermissionDenied:
+		return responseError{Status: http.StatusForbidden}
+	case codes.Unauthenticated:
+		return responseError{Status: http.StatusUnauthorized}
 	}
 	return responseError{Status: http.StatusBadGateway, Err: err}
 }
