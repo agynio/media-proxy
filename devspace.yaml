@@ -164,6 +164,27 @@ dev:
     labelSelector:
       app.kubernetes.io/name: media-proxy
       app.kubernetes.io/instance: media-proxy
+    devImage: ghcr.io/agynio/devcontainer-go:1
+    command:
+      - sh
+      - -c
+      - |-
+        set -eu
+        elapsed=0
+        while [ ! -f /opt/app/data/go.mod ]; do
+          sleep 1; elapsed=$((elapsed + 1))
+          [ "$elapsed" -ge 120 ] && { echo "ERROR: sync timeout" >&2; exit 1; }
+        done
+        buf generate buf.build/agynio/api --include-imports --path agynio/api/files/v1 --path agynio/api/users/v1 --path agynio/api/authorization/v1
+        exec go run ./cmd/media-proxy
+    workingDir: /opt/app/data
+    resources:
+      limits:
+        cpu: "2"
+        memory: 4Gi
+      requests:
+        cpu: 500m
+        memory: 1Gi
     patches:
       - op: remove
         path: spec.containers.name=media-proxy.livenessProbe
@@ -195,23 +216,6 @@ dev:
     containers:
       media-proxy:
         container: media-proxy
-        devImage: ghcr.io/agynio/devcontainer-go:1
-        command:
-          - sh
-          - -c
-          - |-
-            set -eu
-            elapsed=0
-            while [ ! -f /opt/app/data/go.mod ]; do
-              sleep 1; elapsed=$((elapsed + 1))
-              [ "$elapsed" -ge 120 ] && { echo "ERROR: sync timeout" >&2; exit 1; }
-            done
-            buf generate buf.build/agynio/api --include-imports --path agynio/api/files/v1 --path agynio/api/users/v1 --path agynio/api/authorization/v1
-            exec go run ./cmd/media-proxy
-        workingDir: /opt/app/data
-        persistPaths:
-          - path: /opt/app/data
-            skipPopulate: true
         sync:
           - path: ./:/opt/app/data
             excludePaths:
