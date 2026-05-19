@@ -33,3 +33,7 @@ jobs:
         uses: agynio/e2e/.github/actions/run-tests@main
         with:
           service: media_proxy
+
+      - name: Restore ArgoCD auto-sync
+        if: always()
+        run: devspace run-pipeline restore-argocd
