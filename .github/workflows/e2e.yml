@@ -32,7 +32,8 @@ jobs:
       - name: Run E2E tests
         uses: agynio/e2e/.github/actions/run-tests@main
         with:
-          service: media_proxy
+          tag: svc_media_proxy
+          include_smoke: "false"
 
       - name: Restore ArgoCD auto-sync
         if: always()
