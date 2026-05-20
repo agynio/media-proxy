@@ -34,6 +34,8 @@ jobs:
         with:
           tag: svc_media_proxy
           include_smoke: "false"
+        env:
+          E2E_SUITES: go-core
 
       - name: Restore ArgoCD auto-sync
         if: always()
