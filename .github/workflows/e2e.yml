@@ -36,4 +36,4 @@ jobs:
 
       - name: Restore ArgoCD auto-sync
         if: always()
-        run: devspace run-pipeline restore-argocd
+        run: RESTORE_ARGOCD_IN_CI=true devspace run-pipeline restore-argocd
