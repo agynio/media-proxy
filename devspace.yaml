@@ -15,7 +15,7 @@ functions:
       echo "WARNING: ArgoCD Application 'media-proxy' not found in argocd namespace."
     fi
   restore_argocd_sync: &restore_argocd_sync |-
-    if [ -n "${CI:-}" ]; then
+    if [ -n "${CI:-}" ] && [ "${RESTORE_ARGOCD_IN_CI:-}" != "true" ]; then
       echo "Skipping ArgoCD auto-sync restore in CI."
       exit 0
     fi
@@ -118,6 +118,10 @@ pipelines:
         echo "Dev environment ready. Stopping dev session."
         stop_dev media-proxy
       fi
+
+  restore-argocd:
+    run: |-
+      restore_argocd_sync
 
 
 hooks:
