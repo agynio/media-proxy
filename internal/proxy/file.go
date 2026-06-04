@@ -18,7 +18,10 @@ import (
 )
 
 func (h *Handler) handleFile(ctx context.Context, w http.ResponseWriter, fileID string, options requestOptions) error {
-	identityCtx := identity.WithIdentity(ctx, options.identity)
+	identityCtx := ctx
+	if options.identity.IdentityID != "" {
+		identityCtx = identity.WithIdentity(ctx, options.identity)
+	}
 
 	metadata, err := h.files.GetFileMetadata(identityCtx, &filesv1.GetFileMetadataRequest{FileId: fileID})
 	if err != nil {

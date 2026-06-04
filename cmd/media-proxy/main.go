@@ -22,23 +22,31 @@ func main() {
 		log.Fatalf("config error: %v", err)
 	}
 
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
+	var resolver *auth.Resolver
+	if cfg.OIDCIssuerURL != "" {
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
 
-	verifier, err := auth.NewVerifier(ctx, cfg.OIDCIssuerURL, cfg.OIDCClientID)
-	if err != nil {
-		log.Fatalf("oidc verifier error: %v", err)
-	}
-
-	usersClient, err := grpcclient.New(cfg.UsersGRPCTarget, usersv1.NewUsersServiceClient)
-	if err != nil {
-		log.Fatalf("users client error: %v", err)
-	}
-	defer func() {
-		if err := usersClient.Close(); err != nil {
-			log.Printf("users client close error: %v", err)
+		verifier, err := auth.NewVerifier(ctx, cfg.OIDCIssuerURL, cfg.OIDCClientID)
+		if err != nil {
+			log.Fatalf("oidc verifier error: %v", err)
 		}
-	}()
+
+		usersClient, err := grpcclient.New(cfg.UsersGRPCTarget, usersv1.NewUsersServiceClient)
+		if err != nil {
+			log.Fatalf("users client error: %v", err)
+		}
+		defer func() {
+			if err := usersClient.Close(); err != nil {
+				log.Printf("users client close error: %v", err)
+			}
+		}()
+
+		resolver, err = auth.NewResolver(verifier, usersClient.Service(), &http.Client{Timeout: 10 * time.Second})
+		if err != nil {
+			log.Fatalf("auth resolver error: %v", err)
+		}
+	}
 
 	filesClient, err := grpcclient.New(cfg.FilesGRPCTarget, filesv1.NewFilesServiceClient)
 	if err != nil {
@@ -49,11 +57,6 @@ func main() {
 			log.Printf("files client close error: %v", err)
 		}
 	}()
-
-	resolver, err := auth.NewResolver(verifier, usersClient.Service(), &http.Client{Timeout: 10 * time.Second})
-	if err != nil {
-		log.Fatalf("auth resolver error: %v", err)
-	}
 
 	handler, err := proxy.NewHandler(cfg, resolver, filesClient.Service())
 	if err != nil {

@@ -35,8 +35,6 @@ func TestFromEnvDefaults(t *testing.T) {
 
 func TestFromEnvMissingRequired(t *testing.T) {
 	required := []string{
-		"OIDC_ISSUER_URL",
-		"OIDC_CLIENT_ID",
 		"USERS_GRPC_TARGET",
 		"FILES_GRPC_TARGET",
 	}
@@ -49,6 +47,30 @@ func TestFromEnvMissingRequired(t *testing.T) {
 				t.Fatalf("expected error for missing %s", missing)
 			}
 		})
+	}
+}
+
+func TestFromEnvAllowsEmptyOIDC(t *testing.T) {
+	setRequiredEnv(t)
+	t.Setenv("OIDC_ISSUER_URL", "")
+	t.Setenv("OIDC_CLIENT_ID", "")
+
+	cfg, err := FromEnv()
+	if err != nil {
+		t.Fatalf("expected empty OIDC config to be valid, got %v", err)
+	}
+	if cfg.OIDCIssuerURL != "" || cfg.OIDCClientID != "" {
+		t.Fatalf("expected empty OIDC config, got issuer=%q client=%q", cfg.OIDCIssuerURL, cfg.OIDCClientID)
+	}
+}
+
+func TestFromEnvRequiresClientIDWhenOIDCEnabled(t *testing.T) {
+	setRequiredEnv(t)
+	t.Setenv("OIDC_CLIENT_ID", "")
+
+	_, err := FromEnv()
+	if err == nil || err.Error() != "OIDC_CLIENT_ID must be set when OIDC_ISSUER_URL is set" {
+		t.Fatalf("expected client id error, got %v", err)
 	}
 }
 

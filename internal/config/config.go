@@ -38,15 +38,13 @@ func FromEnv() (Config, error) {
 		cfg.ListenAddr = defaultListenAddr
 	}
 
+	cfg.OIDCIssuerURL = strings.TrimSpace(os.Getenv("OIDC_ISSUER_URL"))
+	cfg.OIDCClientID = strings.TrimSpace(os.Getenv("OIDC_CLIENT_ID"))
+	if cfg.OIDCIssuerURL != "" && cfg.OIDCClientID == "" {
+		return Config{}, fmt.Errorf("OIDC_CLIENT_ID must be set when OIDC_ISSUER_URL is set")
+	}
+
 	var err error
-	cfg.OIDCIssuerURL, err = requiredEnv("OIDC_ISSUER_URL")
-	if err != nil {
-		return Config{}, err
-	}
-	cfg.OIDCClientID, err = requiredEnv("OIDC_CLIENT_ID")
-	if err != nil {
-		return Config{}, err
-	}
 	cfg.UsersGRPCTarget, err = requiredEnv("USERS_GRPC_TARGET")
 	if err != nil {
 		return Config{}, err
