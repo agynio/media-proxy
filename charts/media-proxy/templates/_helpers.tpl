@@ -6,10 +6,10 @@
 {{- $env = append $env (dict "name" "LISTEN_ADDR" "value" $listenAddr) -}}
 {{- end }}
 
-{{- $issuer := required "mediaProxy.oidcIssuerUrl is required" (trimAll " \n\t" (default "" .Values.mediaProxy.oidcIssuerUrl)) -}}
+{{- $issuer := trimAll " \n\t" (default "" .Values.mediaProxy.oidcIssuerUrl) -}}
 {{- $env = append $env (dict "name" "OIDC_ISSUER_URL" "value" $issuer) -}}
 
-{{- $clientId := required "mediaProxy.oidcClientId is required" (trimAll " \n\t" (default "" .Values.mediaProxy.oidcClientId)) -}}
+{{- $clientId := trimAll " \n\t" (default "" .Values.mediaProxy.oidcClientId) -}}
 {{- $env = append $env (dict "name" "OIDC_CLIENT_ID" "value" $clientId) -}}
 
 {{- $usersTarget := trimAll " \n\t" (default "users:50051" .Values.mediaProxy.usersGrpcTarget) -}}

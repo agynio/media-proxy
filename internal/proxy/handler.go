@@ -57,9 +57,6 @@ func (e responseError) Error() string {
 }
 
 func NewHandler(cfg config.Config, resolver *auth.Resolver, files filesv1.FilesServiceClient) (*Handler, error) {
-	if resolver == nil {
-		return nil, fmt.Errorf("resolver is required")
-	}
 	if files == nil {
 		return nil, fmt.Errorf("files client is required")
 	}
@@ -106,20 +103,24 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	accessToken, ok := httpauth.ExtractBearerToken(r.Header.Get("Authorization"))
-	if !ok {
-		writeError(w, http.StatusUnauthorized)
-		return
-	}
-
-	resolved, err := h.resolver.ResolveFromToken(r.Context(), accessToken)
-	if err != nil {
-		statusCode := http.StatusBadGateway
-		if status.Code(err) == codes.Unauthenticated {
-			statusCode = http.StatusUnauthorized
+	resolved := identity.ResolvedIdentity{}
+	if h.resolver != nil {
+		accessToken, ok := httpauth.ExtractBearerToken(r.Header.Get("Authorization"))
+		if !ok {
+			writeError(w, http.StatusUnauthorized)
+			return
 		}
-		writeError(w, statusCode)
-		return
+
+		var err error
+		resolved, err = h.resolver.ResolveFromToken(r.Context(), accessToken)
+		if err != nil {
+			statusCode := http.StatusBadGateway
+			if status.Code(err) == codes.Unauthenticated {
+				statusCode = http.StatusUnauthorized
+			}
+			writeError(w, statusCode)
+			return
+		}
 	}
 
 	sizeParam, err := parseSizeParam(r.URL.Query().Get("size"), h.cfg.MaxImageSize)
