@@ -21,6 +21,7 @@ type Config struct {
 	ListenAddr        string
 	OIDCIssuerURL     string
 	OIDCClientID      string
+	OIDCAudience      string
 	UsersGRPCTarget   string
 	FilesGRPCTarget   string
 	CORSAllowedOrigin string
@@ -40,6 +41,7 @@ func FromEnv() (Config, error) {
 
 	cfg.OIDCIssuerURL = strings.TrimSpace(os.Getenv("OIDC_ISSUER_URL"))
 	cfg.OIDCClientID = strings.TrimSpace(os.Getenv("OIDC_CLIENT_ID"))
+	cfg.OIDCAudience = strings.TrimSpace(os.Getenv("OIDC_AUDIENCE"))
 	if cfg.OIDCIssuerURL != "" && cfg.OIDCClientID == "" {
 		return Config{}, fmt.Errorf("OIDC_CLIENT_ID must be set when OIDC_ISSUER_URL is set")
 	}

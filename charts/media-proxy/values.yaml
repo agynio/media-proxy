@@ -168,6 +168,7 @@ mediaProxy:
   listenAddr: ":8080"
   oidcIssuerUrl: ""
   oidcClientId: ""
+  oidcAudience: ""
   usersGrpcTarget: "users:50051"
   filesGrpcTarget: "files:50051"
   corsAllowedOrigin: "https://agyn.dev"

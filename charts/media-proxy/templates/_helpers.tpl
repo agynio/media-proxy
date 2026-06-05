@@ -12,6 +12,9 @@
 {{- $clientId := trimAll " \n\t" (default "" .Values.mediaProxy.oidcClientId) -}}
 {{- $env = append $env (dict "name" "OIDC_CLIENT_ID" "value" $clientId) -}}
 
+{{- $audience := trimAll " \n\t" (default "" .Values.mediaProxy.oidcAudience) -}}
+{{- $env = append $env (dict "name" "OIDC_AUDIENCE" "value" $audience) -}}
+
 {{- $usersTarget := trimAll " \n\t" (default "users:50051" .Values.mediaProxy.usersGrpcTarget) -}}
 {{- $env = append $env (dict "name" "USERS_GRPC_TARGET" "value" $usersTarget) -}}
 
