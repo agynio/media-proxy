@@ -7,6 +7,7 @@ import (
 
 func TestFromEnvDefaults(t *testing.T) {
 	setRequiredEnv(t)
+	t.Setenv("OIDC_AUDIENCE", "https://api.example.com")
 
 	cfg, err := FromEnv()
 	if err != nil {
@@ -30,6 +31,9 @@ func TestFromEnvDefaults(t *testing.T) {
 	}
 	if cfg.MaxImageSize != 4096 {
 		t.Fatalf("unexpected max image size: %d", cfg.MaxImageSize)
+	}
+	if cfg.OIDCAudience != "https://api.example.com" {
+		t.Fatalf("unexpected oidc audience: %s", cfg.OIDCAudience)
 	}
 }
 

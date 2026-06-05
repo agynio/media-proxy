@@ -19,6 +19,7 @@ type Claims struct {
 type Verifier struct {
 	issuer            string
 	clientID          string
+	audience          string
 	keySet            oidc.KeySet
 	userinfoEndpoint  string
 	supportedSignAlgs []string // nil accepts any JWKS alg (matches gateway verifier).
@@ -26,6 +27,10 @@ type Verifier struct {
 }
 
 func NewVerifier(ctx context.Context, issuer, clientID string) (*Verifier, error) {
+	return NewVerifierWithAudience(ctx, issuer, clientID, "")
+}
+
+func NewVerifierWithAudience(ctx context.Context, issuer, clientID, audience string) (*Verifier, error) {
 	trimmedIssuer := strings.TrimSpace(issuer)
 	if trimmedIssuer == "" {
 		return nil, fmt.Errorf("issuer is required")
@@ -34,6 +39,7 @@ func NewVerifier(ctx context.Context, issuer, clientID string) (*Verifier, error
 	if trimmedClientID == "" {
 		return nil, fmt.Errorf("client id is required")
 	}
+	trimmedAudience := strings.TrimSpace(audience)
 
 	discovery, err := client.Discover(ctx, trimmedIssuer, httphelper.DefaultHTTPClient)
 	if err != nil {
@@ -48,6 +54,7 @@ func NewVerifier(ctx context.Context, issuer, clientID string) (*Verifier, error
 	return &Verifier{
 		issuer:           trimmedIssuer,
 		clientID:         trimmedClientID,
+		audience:         trimmedAudience,
 		keySet:           rp.NewRemoteKeySet(httphelper.DefaultHTTPClient, jwksURI),
 		userinfoEndpoint: userinfoEndpoint,
 		clockSkew:        time.Second,
@@ -86,6 +93,9 @@ func (v *Verifier) Verify(ctx context.Context, accessToken string) (Claims, erro
 	if err := oidc.CheckExpiration(&parsed, v.clockSkew); err != nil {
 		return Claims{}, err
 	}
+	if v.audience != "" && !containsAudience(parsed.Audience, v.audience) {
+		return Claims{}, fmt.Errorf("audience %q is required", v.audience)
+	}
 
 	subject := strings.TrimSpace(parsed.Subject)
 	if subject == "" {
@@ -95,4 +105,13 @@ func (v *Verifier) Verify(ctx context.Context, accessToken string) (Claims, erro
 	return Claims{
 		Subject: subject,
 	}, nil
+}
+
+func containsAudience(audiences oidc.Audience, required string) bool {
+	for _, audience := range audiences {
+		if audience == required {
+			return true
+		}
+	}
+	return false
 }

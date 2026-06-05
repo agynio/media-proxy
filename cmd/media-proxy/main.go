@@ -27,7 +27,7 @@ func main() {
 		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 		defer cancel()
 
-		verifier, err := auth.NewVerifier(ctx, cfg.OIDCIssuerURL, cfg.OIDCClientID)
+		verifier, err := auth.NewVerifierWithAudience(ctx, cfg.OIDCIssuerURL, cfg.OIDCClientID, cfg.OIDCAudience)
 		if err != nil {
 			log.Fatalf("oidc verifier error: %v", err)
 		}
