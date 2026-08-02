@@ -138,7 +138,6 @@ dev:
     namespace: ${MEDIA_PROXY_NAMESPACE}
     labelSelector:
       app.kubernetes.io/name: media-proxy
-      app.kubernetes.io/instance: media-proxy
     containers:
       media-proxy:
         container: media-proxy
